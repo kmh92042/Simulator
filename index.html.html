@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scheimpflug Principle: Geometric Proof</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        #canvas-container { position: relative; width: 100vw; height: 100vh; cursor: grab; }
+        #canvas-container:active { cursor: grabbing; }
+        canvas { display: block; width: 100%; height: 100%; }
+        
+        #ui-panel {
+            position: absolute; top: 20px; left: 20px; width: 420px;
+            background: rgba(30, 41, 59, 0.9); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px;
+            padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            max-height: calc(100vh - 40px); overflow-y: auto;
+        }
+        
+        .slider-row { margin-bottom: 20px; }
+        .slider-label { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #e2e8f0; }
+        .slider-val { color: #38bdf8; font-family: monospace; font-size: 15px;}
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%;
+            background: #38bdf8; cursor: pointer; margin-top: -7px; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; cursor: pointer; background: #475569; border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="sim-canvas"></canvas>
+    </div>
+
+    <!-- UI Controls & Explanation -->
+    <div id="ui-panel">
+        <!-- Text Content Provided by User -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-white mb-4">2. 점 S : 샤임플러그 원리의 증명</h2>
+            <p class="text-sm text-slate-300 mb-3 leading-relaxed">
+                그림의 <b>점 S</b>를 주목해 주세요.<br><br>
+                수직으로 내려오는 센서면(IP), 비스듬하게 기울어진 렌즈면(LP), 그리고 피사체를 가로지르는 초점면(PoF)이 <b>정확히 점 S에서 만나고 있습니다.</b> 이것이 렌즈를 기울이면 초점면도 함께 기울어져 한 선에서 만나게 된다는 샤임플러그 원리의 기하학적 증명입니다.
+            </p>
+            
+            <div class="bg-slate-800 p-4 rounded-lg my-4 border border-slate-700">
+                <p class="text-xs text-slate-300 mb-2">이때 초점면이 기울어지는 각도(<span class="italic font-serif text-emerald-400">ψ</span>)는 다음 공식으로 표현됩니다.</p>
+                <div class="text-center text-xl text-sky-400 font-mono font-bold my-3 tracking-wider">
+                    tan ψ = (u / v) × tan θ
+                </div>
+                <ul class="text-[11px] text-slate-400 space-y-2 mt-3 list-disc pl-4">
+                    <li><b class="text-sky-300 text-sm">θ (Theta):</b> 렌즈면(LP)을 꺾은 각도</li>
+                    <li><b class="text-emerald-400 text-sm">ψ (Psi):</b> 초점면(PoF)이 센서면(IP)에 대해 기울어진 각도</li>
+                    <li><b class="text-white">u, v:</b> 렌즈로부터 피사체(초점) 및 센서까지의 거리 비례</li>
+                </ul>
+            </div>
+            
+            <p class="text-[13px] text-amber-200 font-medium leading-relaxed bg-amber-900/20 p-3 rounded border border-amber-700/50">
+                즉, 렌즈 각도(θ)를 고정한 상태에서 <b>초점 링을 돌려 렌즈와 센서 사이의 거리(v)를 바꾸면</b>, 점 S의 위치가 IP(센서면)를 타고 위아래로 이동하면서 초점면의 각도(ψ)가 동적으로 변하게 됩니다.
+            </p>
+        </div>
+
+        <!-- Interactive Sliders -->
+        <div class="border-t border-slate-600 pt-6">
+            <div class="slider-row">
+                <div class="slider-label">
+                    <span>초점 링 조절 (렌즈-센서 거리 <span class="text-white italic">v</span>)</span>
+                    <span id="val-v" class="slider-val">28.0 mm</span>
+                </div>
+                <input type="range" id="s-v" min="25.0" max="32.5" step="0.1" value="28.0">
+            </div>
+            
+            <div class="slider-row">
+                <div class="slider-label">
+                    <span>렌즈 틸트 각도 (<span class="text-sky-300 italic">θ</span>)</span>
+                    <span id="val-theta" class="slider-val text-sky-300">15.0&deg;</span>
+                </div>
+                <input type="range" id="s-theta" min="-45" max="45" step="0.5" value="15">
+            </div>
+        </div>
+        
+        <!-- Live Computed Math Data -->
+        <div class="mt-4 grid grid-cols-2 gap-3 text-xs bg-slate-900 p-3 rounded">
+            <div class="text-slate-400">초점거리 (f): <span class="text-white">25.0 mm</span></div>
+            <div class="text-slate-400">광학 배율 (m): <span id="math-m" class="text-sky-300 font-bold">-</span></div>
+            <div class="text-slate-400">피사체 거리 (u): <span id="math-u" class="text-white">-</span></div>
+            <div class="text-slate-400">S점 Y좌표: <span id="math-sy" class="text-red-400">-</span></div>
+            <div class="col-span-2 text-slate-400">초점면 각도 (ψ): <span id="math-psi" class="text-emerald-400 font-bold">-</span></div>
+        </div>
+    </div>
+
+    <script>
+        // --- State ---
+        let state = {
+            v: 28.0,
+            theta: 15.0,
+            f: 25.0, // Fixed focal length
+            panX: -150, // Initial pan to center the intersection S nicely
+            panY: -50,
+            zoom: 2.0
+        };
+
+        // --- Elements ---
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        
+        const uiElements = {
+            v: { slider: document.getElementById('s-v'), val: document.getElementById('val-v') },
+            theta: { slider: document.getElementById('s-theta'), val: document.getElementById('val-theta') }
+        };
+
+        const mathU = document.getElementById('math-u');
+        const mathSy = document.getElementById('math-sy');
+        const mathPsi = document.getElementById('math-psi');
+        const mathM = document.getElementById('math-m');
+
+        // --- Event Listeners for Controls ---
+        Object.keys(uiElements).forEach(key => {
+            uiElements[key].slider.addEventListener('input', (e) => {
+                state[key] = parseFloat(e.target.value);
+                let displayStr = state[key].toFixed(1);
+                displayStr += (key === 'theta') ? '&deg;' : ' mm';
+                uiElements[key].val.innerHTML = displayStr;
+                draw();
+            });
+        });
+
+        // --- Pan & Zoom Logic ---
+        function resize() {
+            canvas.width = window.innerWidth * window.devicePixelRatio;
+            canvas.height = window.innerHeight * window.devicePixelRatio;
+            draw();
+        }
+        window.addEventListener('resize', resize);
+
+        let isDragging = false;
+        let lastMouse = { x: 0, y: 0 };
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastMouse = { x: e.clientX, y: e.clientY };
+        });
+        window.addEventListener('mouseup', () => { isDragging = false; });
+        window.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                state.panX += (e.clientX - lastMouse.x) / state.zoom;
+                state.panY += (e.clientY - lastMouse.y) / state.zoom;
+                lastMouse = { x: e.clientX, y: e.clientY };
+                draw();
+            }
+        });
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = 1.05;
+            if (e.deltaY < 0) state.zoom *= zoomFactor;
+            else state.zoom /= zoomFactor;
+            state.zoom = Math.max(0.1, Math.min(state.zoom, 10));
+            draw();
+        }, { passive: false });
+
+        // --- Math Engine & Drawing ---
+        function draw() {
+            // 1. Setup & Background
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.scale(state.zoom * window.devicePixelRatio, state.zoom * window.devicePixelRatio);
+            ctx.translate((window.innerWidth/state.zoom)/2 + state.panX, (window.innerHeight/state.zoom)/2 + state.panY);
+
+            // Grid
+            ctx.strokeStyle = '#1e293b'; 
+            ctx.lineWidth = 1 / state.zoom;
+            const gridSize = 50;
+            const viewW = window.innerWidth / state.zoom * 2;
+            const viewH = window.innerHeight / state.zoom * 2;
+            const startX = -state.panX - viewW, endX = -state.panX + viewW;
+            const startY = -state.panY - viewH, endY = -state.panY + viewH;
+
+            ctx.beginPath();
+            for (let x = Math.floor(startX/gridSize)*gridSize; x < endX; x += gridSize) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); }
+            for (let y = Math.floor(startY/gridSize)*gridSize; y < endY; y += gridSize) { ctx.moveTo(startX, y); ctx.lineTo(endX, y); }
+            ctx.stroke();
+
+            // 2. Core Geometric Computations
+            // Coordinate System: IP (Sensor) is at x = 0.
+            // Lens center C is at (v, 0).
+            const thetaRad = state.theta * Math.PI / 180;
+            const v = state.v;
+            const f = state.f;
+            const cx = v; // Lens center X
+            const cy = 0; // Lens center Y
+
+            // Object distance u (Thin lens equation along optical axis)
+            const safeV = Math.max(v, 25.001); // 0으로 나누기 방지
+            const u = (f * safeV) / (safeV - f);
+            const m = (safeV - f) / f;
+            
+            // Scheimpflug Intersection point S (Intersection of LP and IP)
+            // IP is x = 0.
+            // LP passes through (v,0) and is tilted by theta relative to IP (vertical).
+            // Line LP eq: x = v - y * tan(theta) => at x=0, y = v / tan(theta)
+            let sy = null;
+            if (Math.abs(state.theta) > 0.05) {
+                sy = v / Math.tan(thetaRad);
+            }
+
+            // Optical Axis Focal Point P
+            // Axis goes through C(v,0), perpendicular to LP. Direction: (cos theta, sin theta)
+            const drawU = Math.min(u, 10000); // 렌더링 시 무한대 뻗어나감 방지용 제한값
+            const px = cx + drawU * Math.cos(thetaRad);
+            const py = cy + drawU * Math.sin(thetaRad);
+
+            // Calculate Psi (PoF angle) for HUD
+            let psiDeg = 0;
+            if (sy !== null) {
+                // Direction vector of PoF from S to P
+                const dx = px - 0;
+                const dy = py - sy;
+                // Angle relative to vertical IP
+                const angleFromHorizontal = Math.atan2(dy, dx);
+                // Angle between PoF and IP (vertical)
+                const psiRad = Math.atan( (u/v) * Math.tan(thetaRad) );
+                psiDeg = psiRad * 180 / Math.PI;
+            } else {
+                psiDeg = 0; // Parallel lines
+            }
+
+            // Update HUD
+            if (v <= 25.0) {
+                mathU.textContent = '∞ (무한대)';
+                mathM.textContent = '0.00 x';
+            } else {
+                mathU.textContent = u.toFixed(1) + ' mm';
+                mathM.textContent = m.toFixed(2) + ' x';
+            }
+            mathSy.textContent = sy !== null ? sy.toFixed(1) + ' mm' : '∞ (평행)';
+            mathPsi.textContent = sy !== null ? psiDeg.toFixed(2) + '°' : '0.00°';
+
+            // 3. Rendering Geometric Elements
+
+            // A. Optical Axis (Dashed)
+            ctx.strokeStyle = '#64748b'; ctx.setLineDash([5, 5]); ctx.lineWidth = 1.5 / state.zoom;
+            ctx.beginPath();
+            ctx.moveTo(cx - 1000 * Math.cos(thetaRad), cy - 1000 * Math.sin(thetaRad));
+            ctx.lineTo(cx + 1000 * Math.cos(thetaRad), cy + 1000 * Math.sin(thetaRad));
+            ctx.stroke(); ctx.setLineDash([]);
+            
+            // Label Optical Axis
+            ctx.fillStyle = '#64748b'; ctx.font = `italic ${12/state.zoom}px Inter`;
+            ctx.fillText("Optical Axis", cx + 80 * Math.cos(thetaRad), cy + 80 * Math.sin(thetaRad) - 10/state.zoom);
+
+            // B. Image Plane (IP) - Sensor Plane
+            // Fixed at x = 0
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3 / state.zoom;
+            ctx.beginPath(); ctx.moveTo(0, -5000); ctx.lineTo(0, 5000); ctx.stroke();
+            ctx.fillStyle = '#ffffff'; ctx.font = `bold ${14/state.zoom}px Inter`;
+            ctx.fillText("IP (센서면)", -80/state.zoom, -100);
+
+            // C. Lens Plane (LP)
+            // Passes through C(v,0), slope based on theta
+            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3 / state.zoom;
+            ctx.beginPath();
+            ctx.moveTo(cx - 5000 * Math.sin(thetaRad), cy + 5000 * Math.cos(thetaRad));
+            ctx.lineTo(cx + 5000 * Math.sin(thetaRad), cy - 5000 * Math.cos(thetaRad));
+            ctx.stroke();
+            
+            // Draw Lens Center (C)
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath(); ctx.arc(cx, cy, 5/state.zoom, 0, Math.PI*2); ctx.fill();
+            ctx.font = `bold ${14/state.zoom}px Inter`;
+            ctx.fillText("LP (렌즈면)", cx + 20/state.zoom, cy - 40/state.zoom);
+
+            // D. Plane of Focus (PoF)
+            if (sy !== null) {
+                // Passes through S(0, sy) and P(px, py)
+                ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3 / state.zoom;
+                
+                const dirX = px - 0;
+                const dirY = py - sy;
+                const len = Math.hypot(dirX, dirY);
+                const nX = dirX / len;
+                const nY = dirY / len;
+
+                ctx.beginPath();
+                ctx.moveTo(0 - nX * 5000, sy - nY * 5000);
+                ctx.lineTo(0 + nX * 5000, sy + nY * 5000);
+                ctx.stroke();
+
+                ctx.fillStyle = '#10b981'; ctx.font = `bold ${14/state.zoom}px Inter`;
+                ctx.fillText("PoF (초점면)", px + 20/state.zoom, py + 20/state.zoom);
+
+                // E. Point S (Scheimpflug Intersection)
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath(); ctx.arc(0, sy, 7/state.zoom, 0, Math.PI*2); ctx.fill();
+                
+                // Pulsing ring around S
+                ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineWidth = 4 / state.zoom;
+                ctx.beginPath(); ctx.arc(0, sy, 15/state.zoom, 0, Math.PI*2); ctx.stroke();
+
+                ctx.fillStyle = '#ef4444'; ctx.font = `bold ${16/state.zoom}px Inter`;
+                ctx.fillText("S (교차점)", 15/state.zoom, sy + 5/state.zoom);
+
+                // Highlight distance v (IP to Lens Center)
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.setLineDash([4,4]); ctx.lineWidth = 2 / state.zoom;
+                ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(cx, cy); ctx.stroke(); ctx.setLineDash([]);
+                ctx.fillStyle = '#cbd5e1'; ctx.font = `italic ${12/state.zoom}px Inter`;
+                ctx.fillText(`v = ${v.toFixed(1)}`, cx/2 - 15/state.zoom, cy - 10/state.zoom);
+
+            } else {
+                // Parallel case (Theta = 0)
+                ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3 / state.zoom;
+                ctx.beginPath(); ctx.moveTo(px, -5000); ctx.lineTo(px, 5000); ctx.stroke();
+                ctx.fillStyle = '#10b981'; ctx.font = `bold ${14/state.zoom}px Inter`;
+                ctx.fillText("PoF (초점면 - 평행)", px + 20/state.zoom, -100);
+            }
+
+            ctx.restore();
+        }
+
+        // Start loop
+        resize();
+    </script>
+</body>
+</html>
